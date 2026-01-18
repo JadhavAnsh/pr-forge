@@ -196,37 +196,9 @@ Console Output
 4. **Senior-First**: Output matches senior-team standards
 5. **Safe**: Never modifies branches, commits, or working tree
 
-## Roadmap
-
-### V1 (Current)
-✅ Branch diff detection
-✅ Commit aggregation
-✅ Smart rules engine
-✅ Markdown output
-✅ Foundational architecture
-
-### V2 (Planned)
-- [ ] Advanced file analysis (added/deleted/renamed)
-- [ ] Per-rule configuration
-- [ ] Custom rule loading
-- [ ] GitHub/GitLab integration
-- [ ] Migration step suggestions
-
-### V3+ (Future)
-- [ ] AI-enhanced summaries
-- [ ] CI enforcement mode
-- [ ] Template customization
-- [ ] Team-specific configs
-
 ## Contributing
 
 This is a solo project, but future contributions may be accepted. See the module architecture above for where to add features.
-
-## License
-
-TBD
-
----
 
 **Built by engineers, for engineers.**
 Forge better pull requests.
