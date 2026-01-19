@@ -117,6 +117,9 @@ jobs:
       - name: Install cargo-license
         run: cargo install cargo-license
       
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      
       - name: Check licenses
         run: |
           echo "## Dependency Licenses" > licenses.md
