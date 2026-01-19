@@ -1,5 +1,4 @@
 use crate::error::{PrForgeError, Result};
-use log::warn;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -24,8 +23,6 @@ impl Default for RateLimitConfig {
 #[derive(Debug, Clone)]
 pub struct RateLimiter {
     config: RateLimitConfig,
-    window_start: Arc<Mutex<Instant>>,
-    request_count: Arc<Mutex<usize>>,
     request_history: Arc<Mutex<Vec<Instant>>>,
 }
 
@@ -34,8 +31,6 @@ impl RateLimiter {
     pub fn new(config: RateLimitConfig) -> Self {
         Self {
             config,
-            window_start: Arc::new(Mutex::new(Instant::now())),
-            request_count: Arc::new(Mutex::new(0)),
             request_history: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -83,8 +78,6 @@ impl RateLimiter {
     pub fn reset(&self) {
         let mut history = self.request_history.lock().unwrap();
         history.clear();
-        let mut count = self.request_count.lock().unwrap();
-        *count = 0;
     }
 }
 
