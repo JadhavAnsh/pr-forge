@@ -109,4 +109,8 @@ pub struct PRDescription {
     pub impact: String,
     pub risks_and_notes: Vec<String>,
     pub checklist: Vec<(String, bool)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai_changelog: Option<crate::ai::AiGeneratedChangelog>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai_enabled: Option<bool>,
 }

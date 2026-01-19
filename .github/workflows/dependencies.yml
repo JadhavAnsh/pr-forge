@@ -1,0 +1,164 @@
+name: Dependency Management
+
+on:
+  schedule:
+    # Check for updates every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+jobs:
+  check-updates:
+    name: Check for Dependency Updates
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install cargo-edit
+        run: cargo install cargo-edit
+      
+      - name: Check outdated packages
+        id: outdated
+        run: |
+          echo "Checking for outdated packages..."
+          cargo outdated --format list > outdated.txt || true
+          if [ -s outdated.txt ]; then
+            echo "outdated=true" >> $GITHUB_OUTPUT
+            cat outdated.txt
+          else
+            echo "outdated=false" >> $GITHUB_OUTPUT
+            echo "No outdated packages found"
+          fi
+      
+      - name: Create issue for outdated packages
+        if: steps.outdated.outputs.outdated == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const outdated = fs.readFileSync('outdated.txt', 'utf8');
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '📦 Dependency Updates Available',
+              body: `### Outdated Packages\n\n\`\`\`\n${outdated}\`\`\`\n\nRun \`cargo update\` to update dependencies.`,
+              labels: ['dependencies', 'maintenance']
+            })
+
+  security-check:
+    name: Security Vulnerability Check
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run security audit
+        uses: rustsec/audit-check-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Report vulnerabilities
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🔒 Security: Vulnerable Dependency Detected',
+              body: '⚠️ A security audit detected vulnerable dependencies. Please review the audit results and update dependencies accordingly.',
+              labels: ['security', 'critical']
+            })
+
+  verify-lock-file:
+    name: Verify Cargo.lock Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgit2-dev libssh2-1-dev pkg-config
+      
+      - name: Check if Cargo.lock is up to date
+        run: |
+          cargo update --dry-run
+          
+          if git diff --quiet Cargo.lock; then
+            echo "✅ Cargo.lock is up to date"
+          else
+            echo "❌ Cargo.lock is out of date"
+            echo "Run 'cargo update' to update dependencies"
+            exit 1
+          fi
+
+  license-check:
+    name: Check Dependency Licenses
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install cargo-license
+        run: cargo install cargo-license
+      
+      - name: Check licenses
+        run: |
+          echo "## Dependency Licenses" > licenses.md
+          echo "" >> licenses.md
+          cargo license --json | jq -r '.[] | "- \(.name): \(.license)"' >> licenses.md
+          
+          echo "### License Summary"
+          cargo license --json | jq -r '.[] | .license' | sort | uniq -c
+      
+      - name: Upload license report
+        uses: actions/upload-artifact@v3
+        with:
+          name: license-report
+          path: licenses.md
+          retention-days: 30
+
+  duplicate-check:
+    name: Check for Duplicate Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install cargo-tree
+        run: |
+          # cargo-tree is built-in
+          echo "Using built-in cargo-tree"
+      
+      - name: Analyze dependency tree
+        run: |
+          echo "## Dependency Tree Analysis" > tree.txt
+          cargo tree --depth 2 >> tree.txt
+          
+          echo "### Duplicate Dependencies"
+          cargo tree --duplicates >> tree.txt || true
+          
+          cat tree.txt
+      
+      - name: Upload tree report
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-tree
+          path: tree.txt
+          retention-days: 30

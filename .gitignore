@@ -1,1 +1,7 @@
 /target
+.env
+.env.local
+*.key
+.groq-cache/
+.pr-forge/
+.DS_Store

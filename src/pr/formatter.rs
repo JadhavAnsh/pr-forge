@@ -8,6 +8,36 @@ pub fn format_markdown(pr: &PRDescription) -> String {
     output.push_str(&pr.summary);
     output.push_str("\n\n");
 
+    // Add AI-generated changelog if available
+    if let Some(changelog) = &pr.ai_changelog {
+        output.push_str("## Changelog\n\n");
+        
+        for section in &changelog.sections {
+            output.push_str(&format!("{} {}\n", section.emoji, section.category));
+            
+            for entry in &section.entries {
+                output.push_str(&format!("**{}** - {}\n", entry.title, entry.description));
+                
+                if !entry.files.is_empty() {
+                    for file in &entry.files {
+                        output.push_str(&format!("  - `{}`\n", file));
+                    }
+                }
+                output.push_str("\n");
+            }
+        }
+
+        if !changelog.breaking_changes.is_empty() {
+            output.push_str("### 🚨 Breaking Changes\n");
+            for breaking_change in &changelog.breaking_changes {
+                output.push_str(&format!("- {}\n", breaking_change));
+            }
+            output.push_str("\n");
+        }
+
+        output.push_str("\n");
+    }
+
     output.push_str("## Key Changes\n");
     for change in &pr.key_changes {
         output.push_str(change);

@@ -1,3 +1,4 @@
+mod ai;
 mod analysis;
 mod cli;
 mod error;
@@ -55,12 +56,14 @@ fn main() -> Result<()> {
         &args.branch,
     )?;
 
-    // Build PR description
-    let pr = pr::build_pr_description(
+    // Build PR description with optional AI analysis
+    let enable_ai = !args.disable_ai;
+    let pr = pr::build_pr_description_with_ai(
         &args.branch,
         &base_branch,
         commits,
         files,
+        enable_ai,
     );
 
     // Format and print output

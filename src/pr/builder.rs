@@ -3,13 +3,26 @@ use crate::analysis::commit_analyzer::analyze_commits;
 use crate::analysis::file_analyzer::analyze_files;
 use crate::pr::model::{BranchAnalysis, ClassifiedCommit, ChangeType, PRDescription};
 use crate::rules::ruleset::create_default_ruleset;
+use crate::ai::{AiConfig, GroqClient};
+use log::{debug, info, warn};
 
-/// Build a complete PR description from branch analysis
+/// Build a complete PR description from branch analysis with optional AI enhancement
 pub fn build_pr_description(
     branch_name: &str,
     base_branch: &str,
     commits: Vec<crate::pr::model::CommitInfo>,
     files: Vec<String>,
+) -> PRDescription {
+    build_pr_description_with_ai(branch_name, base_branch, commits, files, true)
+}
+
+/// Build PR description with optional AI analysis
+pub fn build_pr_description_with_ai(
+    branch_name: &str,
+    base_branch: &str,
+    commits: Vec<crate::pr::model::CommitInfo>,
+    files: Vec<String>,
+    enable_ai: bool,
 ) -> PRDescription {
     // Classify commits
     let classified = analyze_commits(commits.clone());
@@ -55,6 +68,23 @@ pub fn build_pr_description(
         .map(|c| format!("- {}: {}", c.hash, c.message))
         .collect();
 
+    // Try to enhance with Groq AI analysis if enabled
+    let (ai_changelog, ai_enabled) = if enable_ai {
+        match generate_ai_changelog(&classified, &files, branch_name, base_branch) {
+            Ok(changelog) => {
+                info!("Successfully generated AI-enhanced changelog");
+                (Some(changelog), Some(true))
+            }
+            Err(e) => {
+                warn!("Failed to generate AI changelog, falling back to rule-based analysis: {}", e);
+                (None, Some(false))
+            }
+        }
+    } else {
+        debug!("AI analysis disabled");
+        (None, Some(false))
+    };
+
     PRDescription {
         summary,
         key_changes,
@@ -63,6 +93,8 @@ pub fn build_pr_description(
         impact,
         risks_and_notes,
         checklist,
+        ai_changelog,
+        ai_enabled,
     }
 }
 
@@ -161,4 +193,91 @@ fn generate_checklist(analysis: &BranchAnalysis) -> Vec<(String, bool)> {
             !analysis.has_config_changes,
         ),
     ]
+}
+
+/// Generate AI-enhanced changelog using Groq API
+fn generate_ai_changelog(
+    classified_commits: &[ClassifiedCommit],
+    files: &[String],
+    branch_name: &str,
+    base_branch: &str,
+) -> crate::error::Result<crate::ai::AiGeneratedChangelog> {
+    // Create Groq client with default config
+    let config = crate::ai::GroqConfig::default();
+    let client = GroqClient::new(config)?;
+
+    // Prepare context for Groq
+    let commits_summary = classified_commits
+        .iter()
+        .map(|c| format!("{}: {}", c.change_type, c.description))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let files_summary = if files.len() > 50 {
+        format!("{} files changed (truncated)", files.len())
+    } else {
+        files.join(", ")
+    };
+
+    let system_prompt = r#"You are an expert software engineer analyzing pull request changes. 
+Your task is to generate a professional, well-organized changelog categorizing all changes.
+
+Respond ONLY with valid JSON in this exact format, no markdown code blocks:
+{
+  "sections": [
+    {
+      "category": "UI/UX Improvements",
+      "emoji": "🎨",
+      "entries": [
+        {
+          "title": "Component Name",
+          "description": "Detailed description of what changed",
+          "files": ["path/to/file1", "path/to/file2"]
+        }
+      ]
+    }
+  ],
+  "summary": "Brief overall summary",
+  "breaking_changes": ["List of breaking changes if any"]
+}"#;
+
+    let user_message = format!(
+        r#"Analyze this PR from {} to {} and categorize the changes:
+
+Commits:
+{}
+
+Files Changed:
+{}
+
+Categories to use:
+- 🎨 UI/UX Improvements
+- 🔧 Build & Configuration Fixes
+- 🐛 Bug Fixes
+- 📦 Dependencies
+- 🚀 Performance Improvements
+- 📝 Documentation
+- 🧪 Testing
+- ⚙️ Refactoring
+- 🎯 Breaking Changes
+
+Please provide a comprehensive changelog with all changes properly categorized."#,
+        base_branch, branch_name, commits_summary, files_summary
+    );
+
+    let response = client.chat_completion(system_prompt.to_string(), user_message)?;
+
+    debug!("Groq response: {}", response);
+
+    // Parse JSON response
+    let changelog = serde_json::from_str::<crate::ai::AiGeneratedChangelog>(&response)
+        .map_err(|e| {
+            warn!("Failed to parse Groq response as JSON: {}", e);
+            crate::error::PrForgeError::ApiParseError(format!(
+                "Invalid changelog JSON from Groq: {}",
+                e
+            ))
+        })?;
+
+    Ok(changelog)
 }

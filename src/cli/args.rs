@@ -28,6 +28,10 @@ pub struct Args {
     /// Repository path (default: current directory)
     #[arg(short, long, value_name = "PATH")]
     pub repo: Option<String>,
+
+    /// Disable AI-powered analysis (use rule-based only)
+    #[arg(long)]
+    pub disable_ai: bool,
 }
 
 impl Args {

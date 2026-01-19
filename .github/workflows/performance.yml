@@ -1,0 +1,177 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'benches/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'benches/**'
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: Run Performance Benchmarks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgit2-dev libssh2-1-dev pkg-config
+      
+      - name: Run benchmarks
+        run: |
+          cargo bench --no-run --release 2>&1 | tee benchmark.log || true
+      
+      - name: Analyze results
+        id: results
+        run: |
+          if grep -q "test result:" benchmark.log; then
+            echo "benchmark_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "benchmark_success=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: benchmark.log
+          retention-days: 90
+
+  compile-time:
+    name: Measure Compile Times
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgit2-dev libssh2-1-dev pkg-config time
+      
+      - name: Clean build
+        run: cargo clean
+      
+      - name: Measure debug build time
+        id: debug_time
+        run: |
+          echo "### Debug Build Time" > compile-times.md
+          /usr/bin/time -v cargo build 2>&1 | tee debug.log | grep -E "Elapsed|Maximum|Percent" >> compile-times.md || true
+      
+      - name: Measure release build time
+        id: release_time
+        run: |
+          echo "" >> compile-times.md
+          echo "### Release Build Time" >> compile-times.md
+          /usr/bin/time -v cargo build --release 2>&1 | tee release.log | grep -E "Elapsed|Maximum|Percent" >> compile-times.md || true
+      
+      - name: Upload compile time report
+        uses: actions/upload-artifact@v3
+        with:
+          name: compile-times
+          path: compile-times.md
+          retention-days: 90
+
+  size-analysis:
+    name: Analyze Binary Size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgit2-dev libssh2-1-dev pkg-config
+      
+      - uses: davidB/rust-cargo-make@v1
+      
+      - name: Build release binary
+        run: |
+          cargo build --release
+      
+      - name: Analyze binary size
+        run: |
+          echo "## Binary Size Analysis" > size-analysis.md
+          echo "" >> size-analysis.md
+          
+          BINARY_SIZE=$(ls -lh target/release/pr-forge | awk '{print $5}')
+          echo "**Release Binary Size**: $BINARY_SIZE" >> size-analysis.md
+          echo "" >> size-analysis.md
+          
+          echo "### Section Sizes" >> size-analysis.md
+          size target/release/pr-forge >> size-analysis.md || echo "size command not available" >> size-analysis.md
+          
+          echo "" >> size-analysis.md
+          echo "### Dependencies Size" >> size-analysis.md
+          du -sh target/release/deps/ >> size-analysis.md
+          
+          cat size-analysis.md
+      
+      - name: Upload size report
+        uses: actions/upload-artifact@v3
+        with:
+          name: size-analysis
+          path: size-analysis.md
+          retention-days: 90
+      
+      - name: Compare with baseline (if PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('size-analysis.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `### 📊 Binary Size Analysis\n\n${report}`
+            });
+
+  mem-safety:
+    name: Memory Safety Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: miri
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgit2-dev libssh2-1-dev pkg-config
+      
+      - name: Run miri checks
+        continue-on-error: true
+        run: |
+          cargo miri test --lib 2>&1 | tee miri-results.log || true
+      
+      - name: Upload miri results
+        uses: actions/upload-artifact@v3
+        with:
+          name: miri-results
+          path: miri-results.log
+          retention-days: 30
