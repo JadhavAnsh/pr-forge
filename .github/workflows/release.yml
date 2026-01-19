@@ -36,12 +36,12 @@ jobs:
             TAG=${{ github.event.inputs.version }}
           fi
           
-          # Validate TAG is not empty or null
-          if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
-            echo "❌ Error: TAG is empty or null"
-            echo "ℹ️  github.ref_type: ${{ github.ref_type }}"
-            echo "ℹ️  github.ref_name: ${{ github.ref_name }}"
-            echo "ℹ️  github.event.inputs.version: ${{ github.event.inputs.version }}"
+          # Validate TAG is not empty
+          if [ -z "$TAG" ]; then
+            echo "❌ Error: TAG is empty"
+            echo "ℹ️  github.ref_type: '${{ github.ref_type }}'"
+            echo "ℹ️  github.ref_name: '${{ github.ref_name }}'"
+            echo "ℹ️  github.event.inputs.version: '${{ github.event.inputs.version }}'"
             exit 1
           fi
           
