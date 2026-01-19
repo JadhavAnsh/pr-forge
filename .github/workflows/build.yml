@@ -102,7 +102,12 @@ jobs:
           strip target/${{ matrix.target }}/release/${{ matrix.artifact }} || true
 
       - name: Create artifact directory
-        run: mkdir -p artifacts
+        run: |
+          if [ "${{ matrix.os }}" = "Windows" ]; then
+            powershell -Command "if (-not (Test-Path -Path 'artifacts')) { New-Item -ItemType Directory -Path 'artifacts' | Out-Null }"
+          else
+            mkdir -p artifacts
+          fi
 
       - name: Copy binary (Linux/macOS)
         if: matrix.os != 'Windows'
@@ -110,7 +115,8 @@ jobs:
 
       - name: Copy binary (Windows)
         if: matrix.os == 'Windows'
-        run: copy target\${{ matrix.target }}\release\${{ matrix.artifact }} artifacts\
+        shell: pwsh
+        run: Copy-Item -Path "target/${{ matrix.target }}/release/${{ matrix.artifact }}" -Destination "artifacts/" -Force
 
       - name: Create release archive (Linux)
         if: matrix.os == 'Linux'
@@ -132,10 +138,9 @@ jobs:
 
       - name: Create release archive (Windows)
         if: matrix.os == 'Windows'
+        shell: pwsh
         run: |
-          cd artifacts
-          7z a pr-forge-windows-x86_64.zip pr-forge.exe
-          cd ..
+          Compress-Archive -Path artifacts/pr-forge.exe -DestinationPath artifacts/pr-forge-windows-x86_64.zip -Force
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
@@ -148,7 +153,11 @@ jobs:
         run: |
           echo "Build completed for ${{ matrix.os }}"
           echo "Target: ${{ matrix.target }}"
-          ls -la artifacts/ || dir artifacts\
+          if [ "${{ matrix.os }}" = "Windows" ]; then
+            powershell -Command "Get-ChildItem -Path artifacts | Format-Table -AutoSize"
+          else
+            ls -la artifacts/
+          fi
 
   test:
     name: Test Suite
@@ -161,7 +170,11 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgit2-dev libssh2-1-dev
+          sudo apt-get install -y \
+            libssl-dev \
+            pkg-config \
+            libgit2-dev \
+            libssh2-1-dev
       
       - name: Run all tests
         run: cargo test --verbose
@@ -216,7 +229,7 @@ jobs:
           
           # macOS ARM64
           if [ -d "all-artifacts/pr-forge-macOS ARM64" ]; then
-            cp all-artifacts/pr-forge-macOS\ ARM64/*.tar.gz release-assets/ || true
+            cp "all-artifacts/pr-forge-macOS ARM64"/*.tar.gz release-assets/ || true
           fi
           
           # Windows

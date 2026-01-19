@@ -80,6 +80,18 @@ pub fn format_markdown(pr: &PRDescription) -> String {
         output.push_str(&format!("{} {}\n", checkbox, item));
     }
 
+    // Add AI status indicator
+    if let Some(ai_enabled) = pr.ai_enabled {
+        output.push_str("\n---\n");
+        if ai_enabled && pr.ai_changelog.is_some() {
+            output.push_str("*✨ AI-enhanced analysis enabled*\n");
+        } else if ai_enabled && pr.ai_changelog.is_none() {
+            output.push_str("*⚠️ AI analysis attempted but failed (using rule-based analysis only)*\n");
+        } else {
+            output.push_str("*ℹ️ AI analysis disabled (using rule-based analysis only)*\n");
+        }
+    }
+
     output
 }
 
