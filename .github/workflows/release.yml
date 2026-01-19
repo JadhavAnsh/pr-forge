@@ -33,7 +33,7 @@ jobs:
           if [ "${{ github.ref_type }}" == "tag" ]; then
             TAG=${{ github.ref_name }}
           else
-            TAG=${{ github.event.inputs.version }}
+            TAG="${{ github.event.inputs.version }}"
           fi
           
           # Validate TAG is not empty
