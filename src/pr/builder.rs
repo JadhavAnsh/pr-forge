@@ -7,13 +7,15 @@ use crate::ai::{AiConfig, GroqClient};
 use log::{debug, info, warn};
 
 /// Build a complete PR description from branch analysis with optional AI enhancement
+/// Note: AI is disabled by default for backward compatibility. Use build_pr_description_with_ai
+/// to enable AI-enhanced changelog generation.
 pub fn build_pr_description(
     branch_name: &str,
     base_branch: &str,
     commits: Vec<crate::pr::model::CommitInfo>,
     files: Vec<String>,
 ) -> PRDescription {
-    build_pr_description_with_ai(branch_name, base_branch, commits, files, true)
+    build_pr_description_with_ai(branch_name, base_branch, commits, files, false)
 }
 
 /// Build PR description with optional AI analysis
