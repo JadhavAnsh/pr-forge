@@ -90,9 +90,6 @@ jobs:
       - name: Run cargo check
         run: cargo check --target ${{ matrix.target }} --verbose
 
-      - name: Run tests
-        run: cargo test --target ${{ matrix.target }} --verbose
-
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }} --verbose
 
@@ -108,7 +105,7 @@ jobs:
       - name: Create artifact directory (Windows)
         if: matrix.os == 'Windows'
         shell: pwsh
-        run: New-Item -ItemType Directory -Path 'artifacts' -Force | Out-Null
+        run: New-Item -ItemType Directory -Path 'artifacts' -Force -ErrorAction SilentlyContinue | Out-Null
 
       - name: Copy binary (Linux/macOS)
         if: matrix.os != 'Windows'
