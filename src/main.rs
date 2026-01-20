@@ -38,33 +38,23 @@ fn main() -> Result<()> {
     }
 
     // Get commits between branches
-    let commits = git::commit::get_commits_between(
-        git_repo.inner(),
-        &base_branch,
-        &args.branch,
-    )?;
+    let commits = git::commit::get_commits_between(git_repo.inner(), &base_branch, &args.branch)?;
 
     if commits.is_empty() {
-        println!("No commits found between {} and {}", base_branch, args.branch);
+        println!(
+            "No commits found between {} and {}",
+            base_branch, args.branch
+        );
         return Ok(());
     }
 
     // Get files changed
-    let files = git::commit::get_files_between(
-        git_repo.inner(),
-        &base_branch,
-        &args.branch,
-    )?;
+    let files = git::commit::get_files_between(git_repo.inner(), &base_branch, &args.branch)?;
 
     // Build PR description with optional AI analysis
     let enable_ai = !args.disable_ai;
-    let pr = pr::build_pr_description_with_ai(
-        &args.branch,
-        &base_branch,
-        commits,
-        files,
-        enable_ai,
-    );
+    let pr =
+        pr::build_pr_description_with_ai(&args.branch, &base_branch, commits, files, enable_ai);
 
     // Format and print output
     let format = args.parse_format()?;

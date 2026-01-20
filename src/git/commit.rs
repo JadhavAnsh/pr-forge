@@ -3,11 +3,7 @@ use crate::pr::model::CommitInfo;
 use git2::{Oid, Repository};
 
 /// Get all commits between two references
-pub fn get_commits_between(
-    repo: &Repository,
-    base: &str,
-    head: &str,
-) -> Result<Vec<CommitInfo>> {
+pub fn get_commits_between(repo: &Repository, base: &str, head: &str) -> Result<Vec<CommitInfo>> {
     // Resolve references
     let base_oid = resolve_reference(repo, base)?;
     let head_oid = resolve_reference(repo, head)?;
@@ -38,16 +34,9 @@ pub fn get_commits_between(
             PrForgeError::CommitAnalysisError(format!("Failed to find commit: {}", e))
         })?;
 
-        let message = commit
-            .message()
-            .unwrap_or("(empty message)")
-            .to_string();
+        let message = commit.message().unwrap_or("(empty message)").to_string();
 
-        let author = commit
-            .author()
-            .name()
-            .unwrap_or("Unknown")
-            .to_string();
+        let author = commit.author().name().unwrap_or("Unknown").to_string();
 
         // Get files changed in this commit
         let files = get_files_in_commit(repo, &commit)?;
@@ -88,10 +77,7 @@ fn get_files_in_commit(repo: &Repository, commit: &git2::Commit) -> Result<Vec<S
     })?;
 
     let parent_tree = if commit.parent_count() > 0 {
-        commit
-            .parent(0)
-            .ok()
-            .and_then(|p| p.tree().ok())
+        commit.parent(0).ok().and_then(|p| p.tree().ok())
     } else {
         None
     };
@@ -101,9 +87,7 @@ fn get_files_in_commit(repo: &Repository, commit: &git2::Commit) -> Result<Vec<S
     } else {
         repo.diff_tree_to_tree(None, Some(&tree), None)
     }
-    .map_err(|e| {
-        PrForgeError::CommitAnalysisError(format!("Failed to compute diff: {}", e))
-    })?;
+    .map_err(|e| PrForgeError::CommitAnalysisError(format!("Failed to compute diff: {}", e)))?;
 
     diff.foreach(
         &mut |delta, _| {
@@ -116,28 +100,20 @@ fn get_files_in_commit(repo: &Repository, commit: &git2::Commit) -> Result<Vec<S
         None,
         None,
     )
-    .map_err(|e| {
-        PrForgeError::CommitAnalysisError(format!("Failed to iterate diff: {}", e))
-    })?;
+    .map_err(|e| PrForgeError::CommitAnalysisError(format!("Failed to iterate diff: {}", e)))?;
 
     Ok(files)
 }
 
 /// Get all files changed between two references
-pub fn get_files_between(
-    repo: &Repository,
-    base: &str,
-    head: &str,
-) -> Result<Vec<String>> {
+pub fn get_files_between(repo: &Repository, base: &str, head: &str) -> Result<Vec<String>> {
     let base_oid = resolve_reference(repo, base)?;
     let head_oid = resolve_reference(repo, head)?;
 
-    let base_tree = repo
-        .find_commit(base_oid)
-        .ok()
-        .and_then(|c| c.tree().ok());
+    let base_tree = repo.find_commit(base_oid).ok().and_then(|c| c.tree().ok());
 
-    let head_tree = repo.find_commit(head_oid)
+    let head_tree = repo
+        .find_commit(head_oid)
         .map_err(|e| {
             PrForgeError::CommitAnalysisError(format!("Failed to find head commit: {}", e))
         })?
@@ -148,9 +124,7 @@ pub fn get_files_between(
 
     let diff = repo
         .diff_tree_to_tree(base_tree.as_ref(), Some(&head_tree), None)
-        .map_err(|e| {
-            PrForgeError::CommitAnalysisError(format!("Failed to compute diff: {}", e))
-        })?;
+        .map_err(|e| PrForgeError::CommitAnalysisError(format!("Failed to compute diff: {}", e)))?;
 
     let mut files = Vec::new();
 
@@ -167,9 +141,7 @@ pub fn get_files_between(
         None,
         None,
     )
-    .map_err(|e| {
-        PrForgeError::CommitAnalysisError(format!("Failed to iterate diff: {}", e))
-    })?;
+    .map_err(|e| PrForgeError::CommitAnalysisError(format!("Failed to iterate diff: {}", e)))?;
 
     // Deduplicate
     files.sort();

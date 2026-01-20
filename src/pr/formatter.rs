@@ -11,19 +11,19 @@ pub fn format_markdown(pr: &PRDescription) -> String {
     // Add AI-generated changelog if available
     if let Some(changelog) = &pr.ai_changelog {
         output.push_str("## Changelog\n\n");
-        
+
         for section in &changelog.sections {
             output.push_str(&format!("{} {}\n", section.emoji, section.category));
-            
+
             for entry in &section.entries {
                 output.push_str(&format!("**{}** - {}\n", entry.title, entry.description));
-                
+
                 if !entry.files.is_empty() {
                     for file in &entry.files {
                         output.push_str(&format!("  - `{}`\n", file));
                     }
                 }
-                output.push_str("\n");
+                output.push('\n');
             }
         }
 
@@ -32,33 +32,33 @@ pub fn format_markdown(pr: &PRDescription) -> String {
             for breaking_change in &changelog.breaking_changes {
                 output.push_str(&format!("- {}\n", breaking_change));
             }
-            output.push_str("\n");
+            output.push('\n');
         }
 
-        output.push_str("\n");
+        output.push('\n');
     }
 
     output.push_str("## Key Changes\n");
     for change in &pr.key_changes {
         output.push_str(change);
-        output.push_str("\n");
+        output.push('\n');
     }
-    output.push_str("\n");
+    output.push('\n');
 
     if !pr.files_touched.is_empty() {
         output.push_str("## Files / Areas Touched\n");
         for file in &pr.files_touched {
             output.push_str(&format!("- {}\n", file));
         }
-        output.push_str("\n");
+        output.push('\n');
     }
 
     output.push_str("## Commits Analyzed\n");
     for commit in &pr.commits_analyzed {
         output.push_str(commit);
-        output.push_str("\n");
+        output.push('\n');
     }
-    output.push_str("\n");
+    output.push('\n');
 
     output.push_str("## Impact\n");
     output.push_str(&pr.impact);
@@ -69,9 +69,9 @@ pub fn format_markdown(pr: &PRDescription) -> String {
         for risk in &pr.risks_and_notes {
             output.push_str("- ");
             output.push_str(risk);
-            output.push_str("\n");
+            output.push('\n');
         }
-        output.push_str("\n");
+        output.push('\n');
     }
 
     output.push_str("## Reviewer Checklist\n");
@@ -86,7 +86,9 @@ pub fn format_markdown(pr: &PRDescription) -> String {
         if ai_enabled && pr.ai_changelog.is_some() {
             output.push_str("*✨ AI-enhanced analysis enabled*\n");
         } else if ai_enabled && pr.ai_changelog.is_none() {
-            output.push_str("*⚠️ AI analysis attempted but failed (using rule-based analysis only)*\n");
+            output.push_str(
+                "*⚠️ AI analysis attempted but failed (using rule-based analysis only)*\n",
+            );
             if let Some(error) = &pr.ai_error {
                 // Provide helpful hints based on error type
                 if error.contains("API key not configured") || error.contains("MissingApiKey") {
@@ -117,16 +119,16 @@ pub fn format_plain(pr: &PRDescription) -> String {
     output.push_str("----------\n");
     for change in &pr.key_changes {
         output.push_str(change);
-        output.push_str("\n");
+        output.push('\n');
     }
-    output.push_str("\n");
+    output.push('\n');
 
     output.push_str("FILES TOUCHED\n");
     output.push_str("-------------\n");
     for file in &pr.files_touched {
         output.push_str(&format!("{}\n", file));
     }
-    output.push_str("\n");
+    output.push('\n');
 
     output.push_str("IMPACT\n");
     output.push_str("------\n");

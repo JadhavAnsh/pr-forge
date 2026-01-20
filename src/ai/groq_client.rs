@@ -29,6 +29,7 @@ impl Default for GroqConfig {
 
 /// Message role for chat completion
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub enum MessageRole {
     #[serde(rename = "system")]
     System,
@@ -74,6 +75,7 @@ pub struct GroqRequest {
 #[derive(Debug, Deserialize, Clone)]
 pub struct Choice {
     pub message: ResponseMessage,
+    #[allow(dead_code)]
     pub finish_reason: Option<String>,
 }
 
@@ -85,6 +87,7 @@ pub struct ResponseMessage {
 
 /// Usage statistics in response
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct Usage {
     pub prompt_tokens: Option<usize>,
     pub completion_tokens: Option<usize>,
@@ -102,6 +105,7 @@ pub struct ErrorInfo {
 #[derive(Debug, Deserialize, Clone)]
 pub struct GroqResponse {
     pub choices: Vec<Choice>,
+    #[allow(dead_code)]
     pub usage: Option<Usage>,
     pub error: Option<ErrorInfo>,
 }
@@ -125,11 +129,10 @@ impl GroqResponse {
         }
 
         // Extract content
-        let content = self.choices[0]
-            .message
-            .content
-            .as_ref()
-            .ok_or_else(|| PrForgeError::ApiParseError("Empty content in response".to_string()))?;
+        let content =
+            self.choices[0].message.content.as_ref().ok_or_else(|| {
+                PrForgeError::ApiParseError("Empty content in response".to_string())
+            })?;
 
         if content.is_empty() {
             return Err(PrForgeError::ApiParseError(
@@ -175,11 +178,7 @@ impl GroqClient {
     }
 
     /// Send request to Groq API with retry logic
-    pub fn chat_completion(
-        &self,
-        system_prompt: String,
-        user_message: String,
-    ) -> Result<String> {
+    pub fn chat_completion(&self, system_prompt: String, user_message: String) -> Result<String> {
         let request = GroqRequest {
             model: self.config.model.clone(),
             messages: vec![
@@ -206,11 +205,8 @@ impl GroqClient {
                     if attempt < max_retries {
                         // Classify error as retryable or not
                         if self.is_retryable_error(&e) {
-                            let delay = self.calculate_backoff(
-                                base_delay_ms,
-                                max_delay_ms,
-                                jitter_factor,
-                            );
+                            let delay =
+                                self.calculate_backoff(base_delay_ms, max_delay_ms, jitter_factor);
                             warn!(
                                 "Groq API request failed (attempt {}), retrying after {}ms: {}",
                                 attempt + 1,
@@ -281,19 +277,23 @@ impl GroqClient {
 
         if !status.is_success() {
             // Try to get detailed error message from response body
-            let error_body = response.text().unwrap_or_else(|_| "Unable to read error body".to_string());
+            let error_body = response
+                .text()
+                .unwrap_or_else(|_| "Unable to read error body".to_string());
             return Err(PrForgeError::ApiError {
                 status: status_code,
-                message: format!("HTTP {}: {} - {}", status_code, status.canonical_reason().unwrap_or("Unknown"), error_body),
+                message: format!(
+                    "HTTP {}: {} - {}",
+                    status_code,
+                    status.canonical_reason().unwrap_or("Unknown"),
+                    error_body
+                ),
             });
         }
 
-        let parsed_response: GroqResponse = response.json().map_err(|e| {
-            PrForgeError::ApiParseError(format!(
-                "Failed to parse response: {}",
-                e
-            ))
-        })?;
+        let parsed_response: GroqResponse = response
+            .json()
+            .map_err(|e| PrForgeError::ApiParseError(format!("Failed to parse response: {}", e)))?;
 
         Ok(parsed_response)
     }

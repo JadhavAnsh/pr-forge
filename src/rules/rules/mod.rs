@@ -56,18 +56,20 @@ impl Rule for BreakingChangeRule {
             f.contains("src/lib.rs")
                 || f.contains("src/api")
                 || f.contains("src/public")
-                || (f.ends_with(".rs") && analysis.commits.iter().any(|c| {
-                    c.message.to_lowercase().contains("breaking")
-                        || c.message.to_lowercase().contains("delete")
-                        || c.message.to_lowercase().contains("remove public")
-                }))
+                || (f.ends_with(".rs")
+                    && analysis.commits.iter().any(|c| {
+                        c.message.to_lowercase().contains("breaking")
+                            || c.message.to_lowercase().contains("delete")
+                            || c.message.to_lowercase().contains("remove public")
+                    }))
         });
 
         if has_breaking_signals {
             return Some(RuleFinding {
                 rule_id: self.id().to_string(),
                 severity: Severity::Critical,
-                message: "🚨 Potential breaking changes detected. Consider adding migration notes.".to_string(),
+                message: "🚨 Potential breaking changes detected. Consider adding migration notes."
+                    .to_string(),
             });
         }
 
@@ -100,21 +102,33 @@ impl Rule for ConfigChangeRule {
             return Some(RuleFinding {
                 rule_id: self.id().to_string(),
                 severity: Severity::Warning,
-                message: "⚠️  Configuration files changed. Verify environment updates are documented.".to_string(),
+                message:
+                    "⚠️  Configuration files changed. Verify environment updates are documented."
+                        .to_string(),
             });
         }
 
         // Also check for specific config file patterns
-        let config_patterns = [".env", ".yml", ".yaml", ".json", "docker-compose", "config/"];
-        let has_config_file = analysis.files_changed.iter().any(|f| {
-            config_patterns.iter().any(|pattern| f.contains(pattern))
-        });
+        let config_patterns = [
+            ".env",
+            ".yml",
+            ".yaml",
+            ".json",
+            "docker-compose",
+            "config/",
+        ];
+        let has_config_file = analysis
+            .files_changed
+            .iter()
+            .any(|f| config_patterns.iter().any(|pattern| f.contains(pattern)));
 
         if has_config_file {
             return Some(RuleFinding {
                 rule_id: self.id().to_string(),
                 severity: Severity::Warning,
-                message: "⚠️  Configuration files changed. Verify environment updates are documented.".to_string(),
+                message:
+                    "⚠️  Configuration files changed. Verify environment updates are documented."
+                        .to_string(),
             });
         }
 

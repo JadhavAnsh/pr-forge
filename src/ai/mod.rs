@@ -1,14 +1,15 @@
 pub mod groq_client;
 pub mod rate_limiter;
 
-pub use groq_client::{GroqClient, GroqConfig, GroqResponse};
-pub use rate_limiter::{RateLimiter, RateLimitConfig};
+pub use groq_client::{GroqClient, GroqConfig};
+pub use rate_limiter::RateLimitConfig;
 
 use crate::error::{PrForgeError, Result};
-use std::collections::HashMap;
 
 /// Configuration for AI analysis
 #[derive(Debug, Clone)]
+// Configuration for AI features (for future extensibility)
+#[allow(dead_code)]
 pub struct AiConfig {
     pub groq_config: GroqConfig,
     pub rate_limit_config: RateLimitConfig,

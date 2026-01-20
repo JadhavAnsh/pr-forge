@@ -48,9 +48,7 @@ fn is_api_file(path: &str) -> bool {
 /// Detect if there are breaking changes
 #[allow(dead_code)]
 pub fn detect_breaking_changes(files: &[FileChange]) -> bool {
-    files.iter().any(|f| {
-        f.is_deleted && f.is_api
-    })
+    files.iter().any(|f| f.is_deleted && f.is_api)
 }
 
 /// Summary of file categories

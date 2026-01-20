@@ -19,9 +19,7 @@ pub struct RuleSet {
 impl RuleSet {
     /// Create a new empty ruleset
     pub fn new() -> Self {
-        RuleSet {
-            rules: Vec::new(),
-        }
+        RuleSet { rules: Vec::new() }
     }
 
     /// Add a rule to the set

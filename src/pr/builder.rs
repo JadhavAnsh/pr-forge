@@ -1,12 +1,13 @@
+use crate::ai::GroqClient;
 use crate::analysis::change_classifier::{classify_changes, generate_summary};
 use crate::analysis::commit_analyzer::analyze_commits;
 use crate::analysis::file_analyzer::analyze_files;
-use crate::pr::model::{BranchAnalysis, ClassifiedCommit, ChangeType, PRDescription};
+use crate::pr::model::{BranchAnalysis, ChangeType, ClassifiedCommit, PRDescription};
 use crate::rules::ruleset::create_default_ruleset;
-use crate::ai::{AiConfig, GroqClient};
 use log::{debug, info, warn};
 
 /// Build a complete PR description from branch analysis with optional AI enhancement
+#[allow(dead_code)]
 pub fn build_pr_description(
     branch_name: &str,
     base_branch: &str,
@@ -43,7 +44,7 @@ pub fn build_pr_description_with_ai(
         has_tests: has_tests > 0,
         has_config_changes: has_configs > 0,
         possible_breaking_change: false, // TODO: detect from diffs
-        findings: vec![], // Will be populated by rules
+        findings: vec![],                // Will be populated by rules
     };
 
     // Evaluate rules
@@ -76,7 +77,10 @@ pub fn build_pr_description_with_ai(
                 (Some(changelog), Some(true), None)
             }
             Err(e) => {
-                warn!("Failed to generate AI changelog, falling back to rule-based analysis: {}", e);
+                warn!(
+                    "Failed to generate AI changelog, falling back to rule-based analysis: {}",
+                    e
+                );
                 let error_msg = format!("{}", e);
                 (None, Some(true), Some(error_msg)) // AI was enabled but failed
             }
@@ -111,7 +115,7 @@ fn generate_key_changes(commits: &[ClassifiedCommit]) -> Vec<String> {
     for commit in commits {
         by_type
             .entry(commit.change_type.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(commit);
     }
 
@@ -138,7 +142,10 @@ fn generate_key_changes(commits: &[ClassifiedCommit]) -> Vec<String> {
 
     // Others
     for (change_type, items) in &by_type {
-        if !matches!(change_type, ChangeType::Feature | ChangeType::Fix | ChangeType::Refactor) {
+        if !matches!(
+            change_type,
+            ChangeType::Feature | ChangeType::Fix | ChangeType::Refactor
+        ) {
             for item in items {
                 changes.push(format!("• {}", item.description));
             }
@@ -154,14 +161,13 @@ fn generate_key_changes(commits: &[ClassifiedCommit]) -> Vec<String> {
 
 /// Generate impact section
 fn generate_impact(change_stats: &crate::analysis::change_classifier::ChangeStats) -> String {
-    let mut parts: Vec<String> = vec![
-        "This PR improves code quality and maintainability.".to_string(),
-    ];
-    
+    let mut parts: Vec<String> =
+        vec!["This PR improves code quality and maintainability.".to_string()];
+
     if change_stats.by_type.contains_key(&ChangeType::Feature) {
         parts.push("New functionality is available for end users.".to_string());
     }
-    
+
     if change_stats.by_type.contains_key(&ChangeType::Fix) {
         parts.push("Bug fixes enhance reliability.".to_string());
     }
@@ -177,15 +183,15 @@ fn generate_risks(findings: &[crate::pr::model::RuleFinding]) -> Vec<String> {
 /// Generate reviewer checklist
 fn generate_checklist(analysis: &BranchAnalysis) -> Vec<(String, bool)> {
     vec![
-        ("Code changes are logical and well-organized".to_string(), false),
+        (
+            "Code changes are logical and well-organized".to_string(),
+            false,
+        ),
         (
             "Tests are present and cover new functionality".to_string(),
             analysis.has_tests,
         ),
-        (
-            "Documentation is updated if needed".to_string(),
-            false,
-        ),
+        ("Documentation is updated if needed".to_string(), false),
         (
             "No breaking changes introduced".to_string(),
             !analysis.possible_breaking_change,
@@ -272,8 +278,8 @@ Please provide a comprehensive changelog with all changes properly categorized."
     debug!("Groq response: {}", response);
 
     // Parse JSON response
-    let changelog = serde_json::from_str::<crate::ai::AiGeneratedChangelog>(&response)
-        .map_err(|e| {
+    let changelog =
+        serde_json::from_str::<crate::ai::AiGeneratedChangelog>(&response).map_err(|e| {
             warn!("Failed to parse Groq response as JSON: {}", e);
             crate::error::PrForgeError::ApiParseError(format!(
                 "Invalid changelog JSON from Groq: {}",

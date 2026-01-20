@@ -4,19 +4,16 @@ use std::collections::HashMap;
 /// Statistics about changes grouped by type
 pub struct ChangeStats {
     pub by_type: HashMap<ChangeType, Vec<String>>,
+    #[allow(dead_code)]
     pub total: usize,
 }
 
 /// Classify and group changes
-pub fn classify_changes(
-    commits: &[crate::pr::model::ClassifiedCommit],
-) -> ChangeStats {
+pub fn classify_changes(commits: &[crate::pr::model::ClassifiedCommit]) -> ChangeStats {
     let mut by_type: HashMap<ChangeType, Vec<String>> = HashMap::new();
 
     for commit in commits {
-        let entry = by_type
-            .entry(commit.change_type.clone())
-            .or_insert_with(Vec::new);
+        let entry = by_type.entry(commit.change_type.clone()).or_default();
         entry.push(commit.description.clone());
     }
 
@@ -46,7 +43,7 @@ pub fn generate_summary(stats: &ChangeStats) -> String {
     }
 
     if let Some(_refactors) = stats.by_type.get(&ChangeType::Refactor) {
-        parts.push(format!("refactored code for maintainability"));
+        parts.push("refactored code for maintainability".to_string());
     }
 
     if parts.is_empty() {

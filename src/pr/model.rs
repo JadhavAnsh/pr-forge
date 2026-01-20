@@ -84,6 +84,7 @@ impl std::fmt::Display for ChangeType {
 /// Classified commit with extracted intent
 #[derive(Debug, Clone)]
 pub struct ClassifiedCommit {
+    #[allow(dead_code)]
     pub info: CommitInfo,
     pub change_type: ChangeType,
     pub description: String,
@@ -92,6 +93,7 @@ pub struct ClassifiedCommit {
 /// File change information
 #[derive(Debug, Clone)]
 pub struct FileChange {
+    #[allow(dead_code)]
     pub path: String,
     pub is_test: bool,
     pub is_config: bool,

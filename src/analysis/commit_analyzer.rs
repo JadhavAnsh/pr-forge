@@ -1,9 +1,7 @@
 use crate::pr::model::{ChangeType, ClassifiedCommit, CommitInfo};
 
 /// Analyze commits and classify them
-pub fn analyze_commits(
-    commits: Vec<CommitInfo>,
-) -> Vec<ClassifiedCommit> {
+pub fn analyze_commits(commits: Vec<CommitInfo>) -> Vec<ClassifiedCommit> {
     commits
         .into_iter()
         .map(|commit| {

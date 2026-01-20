@@ -38,6 +38,6 @@ impl Args {
     /// Parse output format from string
     pub fn parse_format(&self) -> crate::error::Result<crate::output::OutputFormat> {
         crate::output::OutputFormat::from_str(&self.format)
-            .map_err(|e| crate::error::PrForgeError::ConfigError(e))
+            .map_err(crate::error::PrForgeError::ConfigError)
     }
 }

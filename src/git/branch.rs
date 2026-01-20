@@ -10,9 +10,9 @@ pub fn branch_exists(repo: &Repository, branch_name: &str) -> Result<bool> {
 /// Get default branch name
 pub fn get_default_branch(repo: &Repository) -> Result<String> {
     // Try to find default from HEAD
-    let head = repo.head().map_err(|e| {
-        PrForgeError::GitError(format!("Failed to read HEAD: {}", e))
-    })?;
+    let head = repo
+        .head()
+        .map_err(|e| PrForgeError::GitError(format!("Failed to read HEAD: {}", e)))?;
 
     if head.is_branch() {
         if let Some(branch_name) = head.shorthand() {

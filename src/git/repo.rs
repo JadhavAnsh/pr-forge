@@ -11,11 +11,7 @@ impl GitRepository {
     /// Open a repository at the given path
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let repo = Repository::open(&path).map_err(|e| {
-            PrForgeError::RepoNotFound(format!(
-                "Failed to open repo at {:?}: {}",
-                path.as_ref(),
-                e
-            ))
+            PrForgeError::RepoNotFound(format!("Failed to open repo at {:?}: {}", path.as_ref(), e))
         })?;
 
         Ok(GitRepository { repo })
@@ -25,7 +21,10 @@ impl GitRepository {
     #[allow(dead_code)]
     pub fn open_current() -> Result<Self> {
         let repo = Repository::discover(".").map_err(|e| {
-            PrForgeError::RepoNotFound(format!("No Git repository found in current directory: {}", e))
+            PrForgeError::RepoNotFound(format!(
+                "No Git repository found in current directory: {}",
+                e
+            ))
         })?;
 
         Ok(GitRepository { repo })

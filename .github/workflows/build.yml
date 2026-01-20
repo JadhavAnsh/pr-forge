@@ -101,13 +101,14 @@ jobs:
         run: |
           strip target/${{ matrix.target }}/release/${{ matrix.artifact }} || true
 
-      - name: Create artifact directory
-        run: |
-          if [ "${{ matrix.os }}" = "Windows" ]; then
-            powershell -Command "if (-not (Test-Path -Path 'artifacts')) { New-Item -ItemType Directory -Path 'artifacts' | Out-Null }"
-          else
-            mkdir -p artifacts
-          fi
+      - name: Create artifact directory (Linux/macOS)
+        if: matrix.os != 'Windows'
+        run: mkdir -p artifacts
+
+      - name: Create artifact directory (Windows)
+        if: matrix.os == 'Windows'
+        shell: pwsh
+        run: New-Item -ItemType Directory -Path 'artifacts' -Force | Out-Null
 
       - name: Copy binary (Linux/macOS)
         if: matrix.os != 'Windows'
@@ -149,15 +150,20 @@ jobs:
           path: artifacts/
           retention-days: 30
 
-      - name: Display build info
+      - name: Display build info (Linux/macOS)
+        if: matrix.os != 'Windows'
         run: |
           echo "Build completed for ${{ matrix.os }}"
           echo "Target: ${{ matrix.target }}"
-          if [ "${{ matrix.os }}" = "Windows" ]; then
-            powershell -Command "Get-ChildItem -Path artifacts | Format-Table -AutoSize"
-          else
-            ls -la artifacts/
-          fi
+          ls -la artifacts/
+
+      - name: Display build info (Windows)
+        if: matrix.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Output "Build completed for ${{ matrix.os }}"
+          Write-Output "Target: ${{ matrix.target }}"
+          Get-ChildItem -Path artifacts | Format-Table -AutoSize
 
   test:
     name: Test Suite
@@ -190,7 +196,16 @@ jobs:
       
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libssl-dev \
+            pkg-config \
+            libgit2-dev \
+            libssh2-1-dev
       
       - name: Check formatting
         run: cargo fmt -- --check
