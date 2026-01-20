@@ -113,4 +113,6 @@ pub struct PRDescription {
     pub ai_changelog: Option<crate::ai::AiGeneratedChangelog>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ai_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai_error: Option<String>,
 }

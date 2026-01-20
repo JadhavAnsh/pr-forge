@@ -69,20 +69,21 @@ pub fn build_pr_description_with_ai(
         .collect();
 
     // Try to enhance with Groq AI analysis if enabled
-    let (ai_changelog, ai_enabled) = if enable_ai {
+    let (ai_changelog, ai_enabled, ai_error) = if enable_ai {
         match generate_ai_changelog(&classified, &files, branch_name, base_branch) {
             Ok(changelog) => {
                 info!("Successfully generated AI-enhanced changelog");
-                (Some(changelog), Some(true))
+                (Some(changelog), Some(true), None)
             }
             Err(e) => {
                 warn!("Failed to generate AI changelog, falling back to rule-based analysis: {}", e);
-                (None, Some(false))
+                let error_msg = format!("{}", e);
+                (None, Some(true), Some(error_msg)) // AI was enabled but failed
             }
         }
     } else {
         debug!("AI analysis disabled");
-        (None, Some(false))
+        (None, Some(false), None)
     };
 
     PRDescription {
@@ -95,6 +96,7 @@ pub fn build_pr_description_with_ai(
         checklist,
         ai_changelog,
         ai_enabled,
+        ai_error,
     }
 }
 

@@ -19,7 +19,7 @@ impl Default for GroqConfig {
         Self {
             api_key: String::new(),
             api_endpoint: "https://api.groq.com/openai/v1/chat/completions".to_string(),
-            model: "mixtral-8x7b-32768".to_string(),
+            model: "llama-3.3-70b-versatile".to_string(), // Updated to current Groq model
             timeout_secs: 30,
             max_tokens: 8000,
             temperature: 0.7,
@@ -280,9 +280,11 @@ impl GroqClient {
         }
 
         if !status.is_success() {
+            // Try to get detailed error message from response body
+            let error_body = response.text().unwrap_or_else(|_| "Unable to read error body".to_string());
             return Err(PrForgeError::ApiError {
                 status: status_code,
-                message: format!("HTTP {}: {}", status_code, status.canonical_reason().unwrap_or("Unknown")),
+                message: format!("HTTP {}: {} - {}", status_code, status.canonical_reason().unwrap_or("Unknown"), error_body),
             });
         }
 

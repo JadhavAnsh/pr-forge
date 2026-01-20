@@ -87,6 +87,15 @@ pub fn format_markdown(pr: &PRDescription) -> String {
             output.push_str("*✨ AI-enhanced analysis enabled*\n");
         } else if ai_enabled && pr.ai_changelog.is_none() {
             output.push_str("*⚠️ AI analysis attempted but failed (using rule-based analysis only)*\n");
+            if let Some(error) = &pr.ai_error {
+                // Provide helpful hints based on error type
+                if error.contains("API key not configured") || error.contains("MissingApiKey") {
+                    output.push_str("*💡 Tip: Set GROQ_API_KEY environment variable or use --disable-ai flag*\n");
+                    output.push_str("*   Get your free API key at https://console.groq.com*\n");
+                } else {
+                    output.push_str(&format!("*   Reason: {}*\n", error));
+                }
+            }
         } else {
             output.push_str("*ℹ️ AI analysis disabled (using rule-based analysis only)*\n");
         }
