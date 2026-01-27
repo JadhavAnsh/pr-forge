@@ -214,21 +214,143 @@ fn generate_ai_changelog(
     let config = crate::ai::GroqConfig::default();
     let client = GroqClient::new(config)?;
 
-    // Prepare context for Groq
+    // Prepare commit context for Groq
     let commits_summary = classified_commits
         .iter()
         .map(|c| format!("{}: {}", c.change_type, c.description))
         .collect::<Vec<_>>()
         .join("\n");
 
-    let files_summary = if files.len() > 50 {
-        format!("{} files changed (truncated)", files.len())
-    } else {
-        files.join(", ")
+    // Analyze files into high-level categories so the AI can describe
+    // how frontend, backend, APIs, docs, tests, and configs are affected.
+    let analyzed_files = analyze_files(files);
+
+    let mut frontend_files: Vec<String> = Vec::new();
+    let mut api_files: Vec<String> = Vec::new();
+    let mut backend_files: Vec<String> = Vec::new();
+    let mut docs_files: Vec<String> = Vec::new();
+    let mut test_files: Vec<String> = Vec::new();
+    let mut config_files: Vec<String> = Vec::new();
+    let mut other_files: Vec<String> = Vec::new();
+
+    for file in &analyzed_files {
+        let path = &file.path;
+        let mut classified = false;
+
+        if is_docs_file(path) {
+            docs_files.push(path.clone());
+            classified = true;
+        }
+        if file.is_test {
+            test_files.push(path.clone());
+            classified = true;
+        }
+        if file.is_config {
+            config_files.push(path.clone());
+            classified = true;
+        }
+        if file.is_api {
+            api_files.push(path.clone());
+            classified = true;
+        }
+        if is_frontend_file(path) {
+            frontend_files.push(path.clone());
+            classified = true;
+        }
+        if is_backend_file(path) {
+            backend_files.push(path.clone());
+            classified = true;
+        }
+
+        if !classified {
+            other_files.push(path.clone());
+        }
+    }
+
+    let summarize_category = |name: &str, files: &Vec<String>, max: usize| -> String {
+        if files.is_empty() {
+            format!("- {}: none detected", name)
+        } else if files.len() > max {
+            format!(
+                "- {}: {} files changed (showing first {}):\n  - {}",
+                name,
+                files.len(),
+                max,
+                files
+                    .iter()
+                    .take(max)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join("\n  - ")
+            )
+        } else {
+            format!(
+                "- {} ({}):\n  - {}",
+                name,
+                files.len(),
+                files.join("\n  - ")
+            )
+        }
     };
 
-    let system_prompt = r#"You are an expert software engineer analyzing pull request changes. 
+    let file_categories_overview = format!(
+        "File categories detected:\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
+        summarize_category("Frontend / UI", &frontend_files, 30),
+        summarize_category("Backend / Core", &backend_files, 30),
+        summarize_category("API / Routes / Handlers", &api_files, 30),
+        summarize_category("Documentation", &docs_files, 30),
+        summarize_category("Tests", &test_files, 30),
+        summarize_category("Config / Infra", &config_files, 30),
+        summarize_category("Other", &other_files, 30),
+    );
+
+    // High-level commit type breakdown to help the AI
+    let mut feature_commits = 0usize;
+    let mut fix_commits = 0usize;
+    let mut refactor_commits = 0usize;
+    let mut docs_commits = 0usize;
+    let mut test_commits = 0usize;
+    let mut perf_commits = 0usize;
+    let mut style_commits = 0usize;
+    let mut other_commits = 0usize;
+
+    for c in classified_commits {
+        match c.change_type {
+            ChangeType::Feature => feature_commits += 1,
+            ChangeType::Fix => fix_commits += 1,
+            ChangeType::Refactor => refactor_commits += 1,
+            ChangeType::Docs => docs_commits += 1,
+            ChangeType::Test => test_commits += 1,
+            ChangeType::Perf => perf_commits += 1,
+            ChangeType::Style => style_commits += 1,
+            ChangeType::Chore | ChangeType::Unknown => other_commits += 1,
+        }
+    }
+
+    let commit_type_overview = format!(
+        "Commit type summary:\n- Features: {}\n- Fixes: {}\n- Refactors: {}\n- Docs: {}\n- Tests: {}\n- Perf: {}\n- Style: {}\n- Other/Chore/Unknown: {}",
+        feature_commits,
+        fix_commits,
+        refactor_commits,
+        docs_commits,
+        test_commits,
+        perf_commits,
+        style_commits,
+        other_commits
+    );
+
+    let system_prompt = r#"You are an expert software engineer analyzing pull request changes.
 Your task is to generate a professional, well-organized changelog categorizing all changes.
+
+Your analysis must adapt to the types of files and commits involved:
+- When frontend or UI-related files are present (e.g. React/Next/Vue components, JS/TS/TSX/JSX files under `src/components` or `src/pages`, CSS/SCSS, HTML templates, design system files), clearly describe user-facing behavior, visual changes, layout adjustments, UX flows, and any accessibility or responsiveness implications.
+- When backend or core server code changes, explain how business logic, domain behavior, data processing, or background jobs are affected, including potential performance or reliability implications.
+- When API/route/handler files change, identify which endpoints or resources are impacted, what new capabilities are added, whether any request/response shapes changed, and how this might break or upgrade existing consumers.
+- When documentation files change, describe which areas of documentation were updated and how they align with the underlying code changes (new features, breaking changes, migration notes, etc.).
+- When tests are added or updated, summarize the new coverage or scenarios being tested and how they protect the changed behavior.
+- When configuration or infrastructure files change (e.g. env, Docker, CI, TOML/YAML/JSON configs), call out deployment, environment, or operational impacts.
+
+If the branch introduces an entirely new resource, module, endpoint, or major feature area (for example new API routes, new top-level modules, or new UI screens/components), explicitly treat this as a **new feature** and call it out as such, not just as a refactor.
 
 Respond ONLY with valid JSON in this exact format, no markdown code blocks:
 {
@@ -255,11 +377,14 @@ Respond ONLY with valid JSON in this exact format, no markdown code blocks:
 Commits:
 {}
 
-Files Changed:
+{}
+
 {}
 
 Categories to use:
 - 🎨 UI/UX Improvements
+- 🧱 Backend & Core Logic
+- 🌐 API & Integrations
 - 🔧 Build & Configuration Fixes
 - 🐛 Bug Fixes
 - 📦 Dependencies
@@ -270,7 +395,7 @@ Categories to use:
 - 🎯 Breaking Changes
 
 Please provide a comprehensive changelog with all changes properly categorized."#,
-        base_branch, branch_name, commits_summary, files_summary
+        base_branch, branch_name, commits_summary, commit_type_overview, file_categories_overview
     );
 
     let response = client.chat_completion(system_prompt.to_string(), user_message)?;
@@ -288,4 +413,87 @@ Please provide a comprehensive changelog with all changes properly categorized."
         })?;
 
     Ok(changelog)
+}
+
+/// Heuristic to detect likely frontend/UI files from a path.
+/// This is intentionally conservative: it tries to capture common
+/// web/frontend stacks (React/Vue/Next/etc.) without being tied
+/// to any one framework.
+fn is_frontend_file(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+
+    // Common component / page / UI directories
+    let ui_dirs = [
+        "src/components",
+        "src/component",
+        "src/pages",
+        "src/views",
+        "src/ui",
+        "src/frontend",
+        "frontend/",
+        "web/",
+        "client/",
+    ];
+
+    let is_ui_dir = ui_dirs.iter().any(|dir| lower.contains(dir));
+
+    // Common frontend file extensions
+    let ui_exts = [
+        ".tsx", ".jsx", ".vue", ".svelte", ".astro", ".html", ".hbs", ".handlebars", ".twig",
+        ".css", ".scss", ".sass", ".less", ".styl", ".stylus",
+    ];
+
+    let is_ui_ext = ui_exts.iter().any(|ext| lower.ends_with(ext));
+
+    // JS/TS files that live under obvious UI dirs
+    let is_js_ts_ui = (lower.ends_with(".ts") || lower.ends_with(".js"))
+        && (lower.contains("src/components")
+            || lower.contains("src/pages")
+            || lower.contains("src/ui")
+            || lower.contains("src/frontend")
+            || lower.contains("/ui/")
+            || lower.contains("/components/"));
+
+    is_ui_dir || is_ui_ext || is_js_ts_ui
+}
+
+/// Heuristic to detect documentation files (Markdown, docs directories, etc.)
+fn is_docs_file(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    lower.ends_with(".md")
+        || lower.ends_with(".rst")
+        || lower.contains("docs/")
+        || lower.starts_with("docs/")
+        || lower.contains("/docs/")
+}
+
+/// Heuristic to detect backend/core code files.
+/// This is kept broad so that we can talk about how server-side or
+/// core business logic is impacted, without being tied to a specific
+/// language or framework.
+fn is_backend_file(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+
+    // Likely backend directories
+    let backend_dirs = [
+        "src/backend",
+        "backend/",
+        "server/",
+        "services/",
+        "src/services",
+        "src/domain",
+        "src/core",
+    ];
+
+    let in_backend_dir = backend_dirs.iter().any(|dir| lower.contains(dir));
+
+    // Common backend/server-side extensions (excluding obvious UI ones)
+    let backend_exts = [".rs", ".go", ".py", ".java", ".kt", ".kts", ".cs", ".rb"];
+    let is_backend_ext = backend_exts.iter().any(|ext| lower.ends_with(ext));
+
+    // Treat generic source files under src/ as backend/core when they haven't
+    // already been classified as frontend or docs/config/test (handled earlier).
+    let is_generic_src = lower.starts_with("src/") || lower.contains("/src/");
+
+    in_backend_dir || is_backend_ext || is_generic_src
 }
